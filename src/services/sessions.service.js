@@ -1,5 +1,6 @@
-import { hashPassword } from '../utils/hash.js';
+import { hashPassword, comparePassword } from '../utils/hash.js';
 import { findByEmail, create } from '../repositories/users.repository.js';
+import { generateToken } from '../utils/jwt.js';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -54,4 +55,31 @@ export const registerUser = async ({ first_name, last_name, email, password }) =
     email: newUser.email,
     role: newUser.role,
   };
+};
+
+export const loginUser = async ({ email, password }) => {
+  // 1. Normalizar email
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+
+  // 2. Validación básica
+  if (!normalizedEmail || !password) {
+    const error = new Error('Credenciales inválidas');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // 3. Buscar usuario
+  const user = await findByEmail(normalizedEmail);
+
+  // 4. Verificar credenciales (mismo error genérico para no filtrar cuál falló)
+  if (!user || !(await comparePassword(password, user.password))) {
+    const error = new Error('Credenciales inválidas');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // 5. Generar token
+  const token = generateToken({ id: user._id, email: user.email, role: user.role });
+
+  return token;
 };
